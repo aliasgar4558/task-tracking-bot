@@ -1,6 +1,6 @@
 # Local Daily Task Logger Bot (V1)
 
-Offline task logger: **CLI** + **desktop GUI** ([CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)). No cloud or AI.
+Offline task logger with a **CLI** and **desktop GUI**. The GUI uses [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter). No cloud or AI.
 
 **Repo:** [aliasgar4558/task-tracking-bot](https://github.com/aliasgar4558/task-tracking-bot) (flat layout: `pyproject.toml` and `taskbot/` at the root).
 
@@ -14,7 +14,7 @@ Two options. Data file: `~/.taskbot/task_logs.json`.
 curl -fsSL https://raw.githubusercontent.com/aliasgar4558/task-tracking-bot/master/install.sh | bash
 ```
 
-Already cloned: `./install.sh`, or `./install.sh --local` for editable install. Needs Python **3.10+** and **git** for the remote install.
+Already cloned: `./install.sh`, or `./install.sh --local` for editable install. Needs Python **3.10+** and **git** for the remote install. The GUI dependency, `customtkinter`, is installed with TaskBot.
 
 **2. pipx**
 
@@ -52,7 +52,7 @@ taskbot help
 
 Without installing from PyPI/git, from the repo root use `python3 bot.py` instead of `taskbot` (same subcommands). Desktop GUI: `python3 gui.py` or `taskbot-gui` after install.
 
-macOS: if the GUI fails with `_tkinter` missing, install Tk for your Python (e.g. `brew install python-tk@X.Y` matching `python3 --version`) or use [python.org](https://www.python.org/downloads/) Python.
+macOS: CustomTkinter runs on top of Tk. If the GUI fails with `_tkinter` missing, install Tk for your Python (e.g. `brew install python-tk@X.Y` matching `python3 --version`) or use [python.org](https://www.python.org/downloads/) Python.
 
 ## JSON shape
 

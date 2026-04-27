@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Desktop window for the Daily Task Logger (tkinter).
+"""Desktop window for the Daily Task Logger (CustomTkinter).
 
 This file stays for backwards compatibility.
 Prefer installing and using `taskbot-gui`.
