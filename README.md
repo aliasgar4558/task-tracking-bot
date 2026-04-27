@@ -4,6 +4,8 @@ Offline task logger: same data for **CLI** and **desktop GUI** (tkinter). No AI,
 
 **Source:** [aliasgar4558/task-tracking-bot](https://github.com/aliasgar4558/task-tracking-bot)
 
+Repo layout matches a **flat GitHub tree**: `pyproject.toml`, `taskbot/` package, `bot.py` / `gui.py` wrappers at the repo root.
+
 ## Setup
 
 Requires Python 3.
@@ -15,8 +17,6 @@ Optional extras:
 - Prettier CLI tables: `tabulate`
 - Excel export (`.xlsx`) in GUI: `openpyxl`
 
-Install optional bits:
-
 ```bash
 python3 -m pip install tabulate openpyxl
 ```
@@ -27,109 +27,84 @@ On macOS with Homebrew Python, global install may be blocked (PEP 668). Use a ve
 python3 -m venv .venv && source .venv/bin/activate && python3 -m pip install tabulate openpyxl
 ```
 
-## Usage
+## Usage (without installing)
+
+From the repository root:
 
 ```bash
-python bot.py add       # Interactive: add task(s) for today
-python bot.py report    # Today's report (table + total effort)
-python bot.py list      # Same table as report
-python bot.py help      # Show help
+python3 bot.py add
+python3 bot.py report
+python3 bot.py list
+python3 bot.py help
+python3 gui.py
 ```
 
-### Install as an app (CLI)
+### Install from GitHub (`pip` / `pipx`)
 
-From the `task_bot/` folder:
+Everything lives at the **repository root**, so:
 
 ```bash
-python3 -m pip install -e .
+python3 -m pip install "git+https://github.com/aliasgar4558/task-tracking-bot.git"
 ```
-
-Then run:
 
 ```bash
-taskbot add
-taskbot report
-taskbot-gui
+pipx install "git+https://github.com/aliasgar4558/task-tracking-bot.git"
 ```
 
-When installed, logs are stored at `~/.taskbot/task_logs.json`.
-
-### Install from GitHub (public repo)
-
-Repo: **https://github.com/aliasgar4558/task-tracking-bot**
-
-Clone and install from a checkout (recommended if ye already cloned):
-
-```bash
-git clone https://github.com/aliasgar4558/task-tracking-bot.git
-cd task-tracking-bot/task_bot
-python3 -m pip install -e .
-```
-
-With `pipx` (install straight from Git without cloning; package lives under `task_bot/` in this repo):
-
-```bash
-brew install pipx   # macOS only; Linux: install pipx via your distro
-pipx ensurepath
-pipx install "git+https://github.com/aliasgar4558/task-tracking-bot.git#subdirectory=task_bot"
-```
-
-With `pip` (into a venv):
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\activate
-python3 -m pip install "git+https://github.com/aliasgar4558/task-tracking-bot.git#subdirectory=task_bot"
-```
-
-After install:
+Then:
 
 ```bash
 taskbot --help
 taskbot-gui
 ```
 
-### Desktop window (tkinter)
+When installed via `pip`, logs are stored at **`~/.taskbot/task_logs.json`**.
 
-Shared logic lives in `core.py`. The GUI reads and writes the same `task_logs.json`.
+### Editable install (local clone)
 
 ```bash
-python gui.py
+git clone https://github.com/aliasgar4558/task-tracking-bot.git
+cd task-tracking-bot
+python3 -m pip install -e .
 ```
 
-Use the **Add task** tab to save entries (optional **Add another** dialog after each save). Open **Today's report** for a sortable table and total hours (Refresh reloads from disk, including changes from the CLI).
+#### Troubleshooting: “neither setup.py nor pyproject.toml found”
+
+GitHub must show **`pyproject.toml` at the repo root** plus the **`taskbot/`** package folder. Push this layout, then rerun `pip install`.
+
+Do **not** use `#subdirectory=task_bot` unless ye actually nest the project under a folder named `task_bot` on GitHub.
+
+### Desktop window (tkinter)
+
+```bash
+python3 gui.py
+```
 
 ### Export (Excel / CSV)
 
-The GUI report tab has **Export**.
-
-- If `openpyxl` is missing, export auto-falls back to `.csv` (Excel can open it).
+The GUI report tab has **Export**. If `openpyxl` is missing, export falls back to `.csv`.
 
 ### GUI: `ModuleNotFoundError: No module named '_tkinter'` (macOS)
-
-Homebrew’s `python@3.x` does not ship Tk until you add it:
 
 ```bash
 brew install python-tk@3.13
 ```
 
-Use the same minor version as `python3 --version` (for example `python-tk@3.14` for Python 3.14). Then run `python3 gui.py` again. If it still fails, run the interpreter from that package:
+Match `3.13` to `python3 --version`. Then:
 
 ```bash
 "$(brew --prefix python-tk@3.13)/bin/python3" gui.py
 ```
 
-Or use the official macOS installer from [python.org](https://www.python.org/downloads/), which includes Tk.
+Or use the installer from [python.org](https://www.python.org/downloads/).
 
-### Files (`task_bot/` layout)
+### Files (repo root)
 
 | Path | Role |
 |------|------|
-| `pyproject.toml` | Package metadata and `taskbot` / `taskbot-gui` scripts |
-| `taskbot/` | Core logic (`core.py`), CLI (`cli.py`), GUI (`gui.py`) |
-| `bot.py`, `gui.py` | Thin wrappers for running without `pip install` |
-
-When ye run scripts from this folder without installing, logs use `task_logs.json` next to those scripts. After `pip install`, logs use `~/.taskbot/task_logs.json`. Do not commit logs (they are gitignored).
+| `pyproject.toml` | Package metadata; defines `taskbot` and `taskbot-gui` commands |
+| `taskbot/` | Core (`core.py`), CLI (`cli.py`), GUI (`gui.py`) |
+| `bot.py`, `gui.py` | Thin wrappers when running without `pip install` |
 
 ## JSON shape
 
