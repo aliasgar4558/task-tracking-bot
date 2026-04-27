@@ -1,0 +1,10 @@
+task_logs.json
+task_logs.json.corrupt
+.venv/
+
+# Python bytecode
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/

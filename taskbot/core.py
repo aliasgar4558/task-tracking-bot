@@ -22,8 +22,7 @@ except Exception:  # pragma: no cover
     Alignment = None  # type: ignore
     Font = None  # type: ignore
 
-# Legacy location (when running scripts from the repo)
-DATA_FILE = Path(__file__).resolve().parent / "task_logs.json"
+DATA_FILE = Path.home() / ".taskbot" / "task_logs.json"
 
 REPORT_HEADERS = [
     "#",
@@ -33,6 +32,7 @@ REPORT_HEADERS = [
     "Challenges / Blockers",
     "Efforts hrs",
 ]
+
 
 def _cell_lines(value: Any) -> list[str]:
     if value is None:
@@ -92,8 +92,6 @@ def _render_grid(headers: list[str], rows: list[list[Any]]) -> str:
 
 
 def _tabulate_grid(headers: list[str], rows: list[list[Any]]) -> str:
-    # tabulate's grid rendering can misalign on multiline cells,
-    # so use our renderer whenever any cell contains a newline.
     for r in rows:
         for c in r:
             if c is not None and ("\n" in str(c) or "\r" in str(c)):
@@ -121,10 +119,11 @@ def load_tasks() -> dict[str, Any]:
     except (json.JSONDecodeError, ValueError) as e:
         backup = DATA_FILE.with_suffix(".json.corrupt")
         try:
+            backup.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(DATA_FILE, backup)
             print(
                 f"Warning: task_logs.json was invalid ({e}). "
-                f"A copy was saved to {backup.name}. Starting with empty logs.",
+                f"A copy was saved to {backup}. Starting with empty logs.",
                 file=sys.stderr,
             )
         except OSError:
@@ -133,6 +132,7 @@ def load_tasks() -> dict[str, Any]:
                 file=sys.stderr,
             )
         try:
+            DATA_FILE.parent.mkdir(parents=True, exist_ok=True)
             DATA_FILE.write_text("{}\n", encoding="utf-8")
         except OSError:
             pass
@@ -237,73 +237,6 @@ def format_report_table(date_str: str, tasks: list[dict[str, Any]]) -> str:
     return f"Date: {date_str}\n\n{body}\n\nTotal Efforts: {format_hours(total)} hrs"
 
 
-def export_report_csv(path: str | Path, date_str: str, tasks: list[dict[str, Any]]) -> tuple[bool, str]:
-    import csv
-
-    p = Path(path)
-    rows, total = tasks_table_rows(tasks)
-    try:
-        with p.open("w", newline="", encoding="utf-8") as f:
-            w = csv.writer(f)
-            w.writerow([f"Date: {date_str}"])
-            w.writerow([])
-            w.writerow(REPORT_HEADERS)
-            w.writerows(rows)
-            w.writerow([])
-            w.writerow(["Total Efforts", format_hours(total)])
-        return True, f"Exported CSV to {p}"
-    except OSError as e:
-        return False, f"Failed to export CSV: {e}"
-
-
-def export_report_xlsx(path: str | Path, date_str: str, tasks: list[dict[str, Any]]) -> tuple[bool, str]:
-    if openpyxl is None:
-        return False, "Excel export needs openpyxl. Install it or export CSV."
-
-    p = Path(path)
-    rows, total = tasks_table_rows(tasks)
-
-    try:
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = date_str
-
-        ws["A1"] = f"Date: {date_str}"
-        if Font is not None:
-            ws["A1"].font = Font(bold=True)
-
-        start_row = 3
-        for i, h in enumerate(REPORT_HEADERS, start=1):
-            c = ws.cell(row=start_row, column=i, value=h)
-            if Font is not None:
-                c.font = Font(bold=True)
-
-        for r_i, r in enumerate(rows, start=start_row + 1):
-            for c_i, val in enumerate(r, start=1):
-                cell = ws.cell(row=r_i, column=c_i, value=val)
-                if Alignment is not None and c_i in (3, 4):
-                    cell.alignment = Alignment(wrap_text=True, vertical="top")
-
-        total_row = start_row + 1 + len(rows) + 2
-        ws.cell(row=total_row, column=1, value="Total Efforts")
-        ws.cell(row=total_row, column=2, value=float(total))
-
-        # crude autosize
-        for col in range(1, len(REPORT_HEADERS) + 1):
-            max_len = 0
-            for row in range(1, total_row + 1):
-                v = ws.cell(row=row, column=col).value
-                if v is None:
-                    continue
-                max_len = max(max_len, len(str(v)))
-            ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = min(max(10, max_len + 2), 60)
-
-        wb.save(p)
-        return True, f"Exported Excel to {p}"
-    except OSError as e:
-        return False, f"Failed to export Excel: {e}"
-
-
 def append_task(
     project: str,
     title: str,
@@ -311,7 +244,6 @@ def append_task(
     blockers: str,
     efforts_hrs: float,
 ) -> tuple[bool, str]:
-    """Persist one task for today. Returns (ok, message)."""
     project = normalize_optional(project)
     title = title.strip()
     if not title:
@@ -359,3 +291,70 @@ def list_projects(data: dict[str, Any]) -> list[str]:
             out.append(ps)
     out.sort(key=lambda s: s.lower())
     return out
+
+
+def export_report_csv(path: str | Path, date_str: str, tasks: list[dict[str, Any]]) -> tuple[bool, str]:
+    import csv
+
+    p = Path(path)
+    rows, total = tasks_table_rows(tasks)
+    try:
+        with p.open("w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow([f"Date: {date_str}"])
+            w.writerow([])
+            w.writerow(REPORT_HEADERS)
+            w.writerows(rows)
+            w.writerow([])
+            w.writerow(["Total Efforts", format_hours(total)])
+        return True, f"Exported CSV to {p}"
+    except OSError as e:
+        return False, f"Failed to export CSV: {e}"
+
+
+def export_report_xlsx(path: str | Path, date_str: str, tasks: list[dict[str, Any]]) -> tuple[bool, str]:
+    if openpyxl is None:
+        return False, "Excel export needs openpyxl. Install it or export CSV."
+
+    p = Path(path)
+    rows, total = tasks_table_rows(tasks)
+
+    try:
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = date_str
+
+        ws["A1"] = f"Date: {date_str}"
+        if Font is not None:
+            ws["A1"].font = Font(bold=True)
+
+        start_row = 3
+        for i, h in enumerate(REPORT_HEADERS, start=1):
+            c = ws.cell(row=start_row, column=i, value=h)
+            if Font is not None:
+                c.font = Font(bold=True)
+
+        for r_i, r in enumerate(rows, start=start_row + 1):
+            for c_i, val in enumerate(r, start=1):
+                cell = ws.cell(row=r_i, column=c_i, value=val)
+                if Alignment is not None and c_i in (4, 5):
+                    cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+        total_row = start_row + 1 + len(rows) + 2
+        ws.cell(row=total_row, column=1, value="Total Efforts")
+        ws.cell(row=total_row, column=2, value=float(total))
+
+        for col in range(1, len(REPORT_HEADERS) + 1):
+            max_len = 0
+            for row in range(1, total_row + 1):
+                v = ws.cell(row=row, column=col).value
+                if v is None:
+                    continue
+                max_len = max(max_len, len(str(v)))
+            ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = min(max(10, max_len + 2), 60)
+
+        wb.save(p)
+        return True, f"Exported Excel to {p}"
+    except OSError as e:
+        return False, f"Failed to export Excel: {e}"
+

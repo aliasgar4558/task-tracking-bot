@@ -1,0 +1,27 @@
+ [build-system]
+ requires = ["setuptools>=68", "wheel"]
+ build-backend = "setuptools.build_meta"
+ 
+ [project]
+ name = "taskbot"
+ version = "1.0.0"
+ description = "Local Daily Task Logger Bot (offline, CLI + desktop GUI)"
+ readme = "README.md"
+ requires-python = ">=3.10"
+ dependencies = []
+ 
+ [project.optional-dependencies]
+ pretty = ["tabulate"]
+ excel = ["openpyxl"]
+ all = ["tabulate", "openpyxl"]
+ 
+ [project.scripts]
+ taskbot = "taskbot.cli:main"
+ taskbot-gui = "taskbot.gui:main"
+ 
+ [tool.setuptools]
+ package-dir = {"" = "."}
+ 
+ [tool.setuptools.packages.find]
+ where = ["."]
+ include = ["taskbot*"]
