@@ -16,10 +16,14 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+MARK_START = "# >>> taskbot PATH >>>"
+MARK_END = "# <<< taskbot PATH <<<"
 
 
 DEFAULT_REPO = "https://github.com/aliasgar4558/task-tracking-bot.git"
@@ -52,6 +56,71 @@ def _venv_bin(venv: Path, name: str) -> Path:
     if sys.platform == "win32":
         return venv / "Scripts" / f"{name}.exe"
     return venv / "bin" / name
+
+
+def _export_path_line(bin_dir: Path) -> str:
+    p = str(bin_dir.resolve())
+    escaped = p.replace("\\", "\\\\").replace('"', '\\"')
+    return f'export PATH="{escaped}:$PATH"'
+
+
+def _replace_taskbot_path_block(content: str, export_line: str) -> str:
+    block = f"{MARK_START}\n{export_line}\n{MARK_END}\n"
+    pat = re.compile(
+        re.escape(MARK_START) + r"\n.*?\n" + re.escape(MARK_END) + r"\n?",
+        re.DOTALL,
+    )
+    if pat.search(content):
+        return pat.sub(block, content, count=1)
+    sep = "\n\n" if content.strip() else ""
+    return content.rstrip() + sep + block
+
+
+def _shell_rc_candidates() -> list[Path]:
+    home = Path.home()
+    shell = os.environ.get("SHELL", "")
+    paths: list[Path] = []
+    if "zsh" in shell:
+        paths.append(home / ".zshrc")
+    elif "bash" in shell:
+        paths.append(home / ".bashrc")
+        if sys.platform == "darwin":
+            paths.append(home / ".bash_profile")
+    else:
+        paths.extend([home / ".zshrc", home / ".bashrc"])
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for p in paths:
+        try:
+            key = p.resolve()
+        except OSError:
+            key = p
+        if key not in seen:
+            seen.add(key)
+            out.append(p)
+    return out
+
+
+def _configure_shell_path(bin_dir: Path) -> list[Path]:
+    if os.environ.get("TASKBOT_SKIP_SHELL_PATH"):
+        return []
+    export_line = _export_path_line(bin_dir)
+    updated: list[Path] = []
+    for rc in _shell_rc_candidates():
+        if rc.exists() and rc.is_dir():
+            print(f"taskbot install: skip shell hook (not a file): {rc}", file=sys.stderr)
+            continue
+        try:
+            prev = rc.read_text(encoding="utf-8") if rc.exists() else ""
+            new_text = _replace_taskbot_path_block(prev, export_line)
+            if new_text == prev:
+                continue
+            rc.parent.mkdir(parents=True, exist_ok=True)
+            rc.write_text(new_text, encoding="utf-8")
+            updated.append(rc)
+        except OSError as e:
+            print(f"taskbot install: could not write {rc}: {e}", file=sys.stderr)
+    return updated
 
 
 def _symlink_or_copy(src: Path, dst: Path) -> None:
@@ -139,12 +208,39 @@ def main() -> int:
     print("TaskBot installed.")
     print(f"  Virtualenv: {venv_path}")
     print(f"  Commands:   {bin_dir / 'taskbot'} and {bin_dir / 'taskbot-gui'}")
+
+    bin_s = str(bin_dir.resolve())
+    rc_updated = _configure_shell_path(bin_dir)
     path_s = os.environ.get("PATH", "")
-    bin_s = str(bin_dir)
-    if bin_s not in path_s.split(os.pathsep):
+    on_path = bin_s in path_s.split(os.pathsep)
+
+    if rc_updated:
+        files = ", ".join(str(p) for p in rc_updated)
         print()
-        print("Add this line to ~/.zshrc or ~/.bashrc, then open a new terminal:")
-        print(f'  export PATH="{bin_s}:$PATH"')
+        print(f"Added TaskBot to PATH in: {files}")
+        print("New terminal windows will have taskbot and taskbot-gui on your PATH.")
+        primary = rc_updated[0]
+        print()
+        print("This terminal only, run once:")
+        print(f"  source {primary}")
+    elif not on_path:
+        sourced = False
+        if not os.environ.get("TASKBOT_SKIP_SHELL_PATH"):
+            for rc in _shell_rc_candidates():
+                try:
+                    if rc.is_file() and MARK_START in rc.read_text(encoding="utf-8", errors="replace"):
+                        print()
+                        print("Load PATH in this terminal:")
+                        print(f"  source {rc}")
+                        sourced = True
+                        break
+                except OSError:
+                    continue
+            if not sourced:
+                print()
+                print("Could not update your shell startup file automatically.")
+                print("Add this line to ~/.zshrc or ~/.bashrc, then open a new terminal:")
+                print(f'  export PATH="{bin_s}:$PATH"')
 
     return 0
 

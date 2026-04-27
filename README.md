@@ -14,7 +14,7 @@ curl -fsSL https://raw.githubusercontent.com/aliasgar4558/task-tracking-bot/mast
 
 Replace `master` with your default branch if different.
 
-Afterward run **`taskbot`** and **`taskbot-gui`**. If the installer prints an `export PATH=...` line, add it to your shell config.
+The installer tries to append a **`PATH`** line to **`~/.zshrc`** or **`~/.bashrc`** (from your **`$SHELL`**). Open a **new terminal**, or run **`source ~/.zshrc`** (or the file it names) once in the current window. To skip editing shell files: **`TASKBOT_SKIP_SHELL_PATH=1`** before running the installer.
 
 Task log file: **`~/.taskbot/task_logs.json`**. The installer puts the venv under `~/.local/share/taskbot` when possible; otherwise **`~/.taskbot`**. If your home folder is locked down, set **`TASKBOT_HOME`** (and optionally **`TASKBOT_BIN`**) to writable paths before running the command above.
 
