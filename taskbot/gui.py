@@ -238,10 +238,10 @@ class TaskLoggerApp(ctk.CTk):
         f = self._add_tab
         scroll = ctk.CTkScrollableFrame(f, fg_color=IOS_GROUP_BG, corner_radius=0)
         self._set_scroll_canvas_bg(scroll, IOS_GROUP_BG)
-        scroll.pack(fill="both", expand=True)
+        scroll.pack(fill="both", expand=True, padx=16, pady=16)
 
         hero = ctk.CTkFrame(scroll, fg_color="transparent")
-        hero.pack(fill="x", padx=4, pady=(0, 10))
+        hero.pack(fill="x", padx=8, pady=(0, 10))
         ctk.CTkLabel(hero, text="New task", font=_md_font(22, "bold"), text_color=MD_TEXT).pack(anchor="w")
         ctk.CTkLabel(
             hero,
@@ -250,9 +250,14 @@ class TaskLoggerApp(ctk.CTk):
             text_color=MD_TEXT_SECONDARY,
         ).pack(anchor="w", pady=(4, 0))
 
+        body = ctk.CTkFrame(scroll, fg_color="transparent")
+        body.pack(fill="both", expand=True)
+        body.columnconfigure(0, weight=2)
+        body.columnconfigure(1, weight=1)
+
         self._project_var = tk.StringVar()
-        basics_outer = ctk.CTkFrame(scroll, fg_color=IOS_FIELD_BG, corner_radius=14, border_width=1, border_color=MD_OUTLINE)
-        basics_outer.pack(fill="x", pady=(0, 8))
+        basics_outer = ctk.CTkFrame(body, fg_color=IOS_FIELD_BG, corner_radius=14, border_width=1, border_color=MD_OUTLINE)
+        basics_outer.grid(row=0, column=0, sticky="nsew", padx=(0, 12))
         ctk.CTkLabel(
             basics_outer,
             text="TASK",
@@ -324,16 +329,8 @@ class TaskLoggerApp(ctk.CTk):
         self._title_entry.grid(row=4, column=0, columnspan=2, sticky="ew")
         self._bind_editing_shortcuts(self._title_entry)
 
-        details_outer = ctk.CTkFrame(scroll, fg_color=IOS_FIELD_BG, corner_radius=14, border_width=1, border_color=MD_OUTLINE)
-        details_outer.pack(fill="x", pady=(0, 8))
-        ctk.CTkLabel(
-            details_outer,
-            text="DETAILS",
-            font=_md_font(11, "bold"),
-            text_color=MD_TEXT_SECONDARY,
-        ).pack(anchor="w", padx=14, pady=(10, 6))
-        details = ctk.CTkFrame(details_outer, fg_color="transparent")
-        details.pack(fill="x", padx=14, pady=(0, 12))
+        details = ctk.CTkFrame(basics_outer, fg_color="transparent")
+        details.pack(fill="x", padx=16, pady=(0, 12))
         details.columnconfigure(0, weight=1)
 
         ctk.CTkLabel(details, text="Description", font=_md_font(12, "bold"), text_color=MD_TEXT).grid(
@@ -347,37 +344,47 @@ class TaskLoggerApp(ctk.CTk):
             row=2, column=0, sticky="w", pady=(10, 5)
         )
         self._block_text = ctk.CTkTextbox(details, height=66, corner_radius=10, border_width=1, fg_color=IOS_FIELD_BG)
-        self._block_text.grid(row=3, column=0, sticky="ew")
+        self._block_text.grid(row=3, column=0, sticky="ew", pady=(0, 16))
         self._bind_editing_shortcuts(self._block_text)
 
-        btn_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        btn_row.pack(fill="x", pady=(2, 8))
-        btn_row.columnconfigure(0, weight=1)
-        btn_row.columnconfigure(1, weight=1)
-        btn_row.columnconfigure(2, weight=1)
+        action_panel = ctk.CTkFrame(
+            body,
+            width=220,
+            fg_color=IOS_FIELD_BG,
+            corner_radius=14,
+            border_width=1,
+            border_color=MD_OUTLINE,
+        )
+        action_panel.grid(row=0, column=1, sticky="new")
+        ctk.CTkLabel(
+            action_panel,
+            text="ACTIONS",
+            font=_md_font(11, "bold"),
+            text_color=MD_TEXT_SECONDARY,
+        ).pack(anchor="w", padx=14, pady=(10, 8))
         ctk.CTkButton(
-            btn_row,
+            action_panel,
             text="+ Save task",
             command=self._save_task,
             fg_color=MD_TEAL,
             hover_color=MD_TEAL_DARK,
             height=40,
-            corner_radius=12,
+            corner_radius=8,
             font=_md_font(13, "bold"),
-        ).grid(row=0, column=0, sticky="ew")
+        ).pack(fill="x", padx=14, pady=(0, 8))
         ctk.CTkButton(
-            btn_row,
+            action_panel,
             text="× Clear",
             command=self._clear_and_status,
             fg_color=MD_OUTLINE,
             text_color=MD_TEXT,
             hover_color="#D0D0D0",
             height=40,
-            corner_radius=12,
+            corner_radius=8,
             font=_md_font(13),
-        ).grid(row=0, column=1, sticky="ew", padx=(10, 0))
+        ).pack(fill="x", padx=14, pady=(0, 8))
         ctk.CTkButton(
-            btn_row,
+            action_panel,
             text="▦ View report",
             command=self._show_report_tab,
             fg_color="transparent",
@@ -386,11 +393,11 @@ class TaskLoggerApp(ctk.CTk):
             border_width=1,
             border_color=MD_OUTLINE_STRONG,
             height=40,
-            corner_radius=12,
+            corner_radius=8,
             font=_md_font(13),
-        ).grid(row=0, column=2, sticky="ew", padx=(10, 0))
+        ).pack(fill="x", padx=14, pady=(0, 10))
 
-        status_card = ctk.CTkFrame(scroll, fg_color="#E8F5E9", corner_radius=14, border_width=1, border_color="#C8E6C9")
+        status_card = ctk.CTkFrame(action_panel, fg_color="#E8F5E9", corner_radius=12, border_width=1, border_color="#C8E6C9")
         self._status_card = status_card
         ctk.CTkLabel(
             status_card,
@@ -399,14 +406,16 @@ class TaskLoggerApp(ctk.CTk):
             text_color="#2E7D32",
             anchor="w",
             justify="left",
+            wraplength=170,
         ).pack(anchor="w", padx=12, pady=8)
 
         ctk.CTkLabel(
-            scroll,
-            text="Data file (installed): ~/.taskbot/task_logs.json",
+            action_panel,
+            text="Data file: ~/.taskbot/task_logs.json",
             font=_md_font(11),
             text_color=MD_TEXT_SECONDARY,
-        ).pack(anchor="w", pady=(2, 4))
+            justify="left",
+        ).pack(anchor="w", padx=14, pady=(2, 12))
 
     def _build_report_tab(self) -> None:
         f = self._report_tab
@@ -620,7 +629,7 @@ class TaskLoggerApp(ctk.CTk):
     def _show_status(self, message: str) -> None:
         self._status_var.set(message)
         if hasattr(self, "_status_card") and not self._status_card.winfo_ismapped():
-            self._status_card.pack(fill="x", pady=(6, 6))
+            self._status_card.pack(fill="x", padx=14, pady=(0, 8))
 
     def _hide_status(self) -> None:
         if hasattr(self, "_status_card"):
