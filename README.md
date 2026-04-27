@@ -58,6 +58,10 @@ macOS: CustomTkinter runs on top of Tk. If the GUI fails with `_tkinter` missing
 
 Dates are `YYYY-MM-DD` keys; each day is a list of tasks (`id`, `project`, `task_title`, `task_description`, `blockers`, `efforts_hrs`). Empty optionals stored as `"-"`.
 
-## V2 ideas (not built)
+## Future Enhancements (V2 - Do Not Implement Now)
 
-Edits/deletes, weekly reports, AI.
+- AI-based rephrasing
+- Task editing and deletion
+- Weekly/monthly reports
+- Web interface
+- Local AI integration (Ollama)
