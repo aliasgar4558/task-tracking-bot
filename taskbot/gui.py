@@ -4,10 +4,9 @@
 from __future__ import annotations
 
 import sys
-
 try:
     import tkinter as tk
-    from tkinter import filedialog, messagebox, ttk
+    from tkinter import filedialog, messagebox
 except ImportError as exc:
     pv = f"{sys.version_info.major}.{sys.version_info.minor}"
     print(
@@ -47,9 +46,19 @@ MD_TEAL_DARK = "#00695C"
 MD_SURFACE = "#FAFAFA"
 MD_CARD = "#FFFFFF"
 MD_OUTLINE = "#E0E0E0"
+MD_OUTLINE_STRONG = "#BDBDBD"
 MD_TEXT = "#212121"
 MD_TEXT_SECONDARY = "#757575"
+MD_SOFT_TEAL = "#E0F2F1"
 ROW_ALT = "#F5F5F5"
+REPORT_COLS = (
+    ("seq", "#", 44, 0),
+    ("project", "Project", 120, 1),
+    ("title", "Task Title", 160, 2),
+    ("desc", "Task Description", 260, 4),
+    ("blockers", "Challenges / Blockers", 220, 3),
+    ("hrs", "Efforts hrs", 88, 0),
+)
 
 APP_NAME = "TaskBot"
 
@@ -79,6 +88,33 @@ def _md_font(size: int, weight: str = "normal") -> ctk.CTkFont:
     return ctk.CTkFont(size=size, weight=weight)
 
 
+class SmoothScrollableFrame(ctk.CTkScrollableFrame):
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        super().__init__(*args, **kwargs)
+        self.bind_all("<Button-4>", self._mouse_wheel_all, add="+")
+        self.bind_all("<Button-5>", self._mouse_wheel_all, add="+")
+
+    def _mouse_wheel_all(self, event: tk.Event) -> None:
+        if not self.check_if_master_is_canvas(event.widget):
+            return
+        if self._parent_canvas.yview() == (0.0, 1.0):
+            return
+
+        if getattr(event, "num", None) == 4:
+            delta = -1.0
+        elif getattr(event, "num", None) == 5:
+            delta = 1.0
+        else:
+            raw_delta = getattr(event, "delta", 0)
+            if sys.platform.startswith("win"):
+                delta = -(raw_delta / 120)
+            else:
+                delta = -raw_delta
+
+        first, _last = self._parent_canvas.yview()
+        self._parent_canvas.yview_moveto(min(max(first + (delta * 0.035), 0.0), 1.0))
+
+
 class TaskLoggerApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
@@ -95,20 +131,20 @@ class TaskLoggerApp(ctk.CTk):
         self._status_var = tk.StringVar(value="")
         self._all_projects: list[str] = []
         self._autocomplete_lock = False
+        self._task_count_var = tk.StringVar(value="0")
+        self._project_count_var = tk.StringVar(value="0")
+        self._today_hours_var = tk.StringVar(value="0")
+        self._active_page = "log"
 
         self._build_header()
-        self._tabview = ctk.CTkTabview(self, corner_radius=12, fg_color=MD_CARD, segmented_button_fg_color=MD_OUTLINE)
-        self._tabview.pack(fill="both", expand=True, padx=16, pady=(0, 16))
-        self._tabview.configure(command=self._on_tab_changed)
+        self._content = ctk.CTkFrame(self, corner_radius=12, fg_color=MD_CARD)
+        self._content.pack(fill="both", expand=True, padx=16, pady=(16, 16))
+        self._add_tab = ctk.CTkFrame(self._content, fg_color="transparent")
+        self._report_tab = ctk.CTkFrame(self._content, fg_color="transparent")
 
-        self._tabview.add("Log task")
-        self._tabview.add("Today's report")
-        self._add_tab = self._tabview.tab("Log task")
-        self._report_tab = self._tabview.tab("Today's report")
-
-        self._setup_tree_style()
         self._build_add_tab()
         self._build_report_tab()
+        self._show_add_tab()
 
         self._refresh_project_values()
 
@@ -150,40 +186,42 @@ class TaskLoggerApp(ctk.CTk):
         bar.pack(fill="x")
         inner = ctk.CTkFrame(bar, fg_color="transparent")
         inner.pack(fill="x", padx=20, pady=(18, 16))
-        ctk.CTkLabel(inner, text=APP_NAME, font=_md_font(22, "bold"), text_color="white").pack(anchor="w")
+        title_area = ctk.CTkFrame(inner, fg_color="transparent")
+        title_area.pack(side="left", fill="x", expand=True)
+        ctk.CTkLabel(title_area, text=APP_NAME, font=_md_font(22, "bold"), text_color="white").pack(anchor="w")
         ctk.CTkLabel(
-            inner,
+            title_area,
             text="Log what you did today. Everything stays on this machine.",
             font=_md_font(13),
             text_color="#B2DFDB",
         ).pack(anchor="w", pady=(4, 0))
-
-    def _setup_tree_style(self) -> None:
-        style = ttk.Style()
-        try:
-            style.theme_use("clam")
-        except tk.TclError:
-            pass
-        style.configure(
-            "Material.Treeview",
-            background="#FFFFFF",
-            fieldbackground="#FFFFFF",
-            foreground=MD_TEXT,
-            rowheight=28,
-            font=("Segoe UI", 11) if sys.platform == "win32" else ("Helvetica Neue", 11),
+        actions = ctk.CTkFrame(inner, fg_color="transparent")
+        actions.pack(side="right", padx=(16, 0))
+        self._log_nav_btn = ctk.CTkButton(
+            actions,
+            text="+ Log task",
+            command=self._show_add_tab,
+            width=112,
+            height=36,
+            corner_radius=8,
+            fg_color="white",
+            text_color=MD_TEAL_DARK,
+            hover_color=MD_SOFT_TEAL,
+            font=_md_font(13, "bold"),
         )
-        style.configure(
-            "Material.Treeview.Heading",
-            background="#EEEEEE",
-            foreground=MD_TEXT,
-            relief="flat",
-            font=("Segoe UI", 10, "bold") if sys.platform == "win32" else ("Helvetica Neue", 10, "bold"),
+        self._log_nav_btn.pack(side="left", padx=(0, 8))
+        self._report_nav_btn = ctk.CTkButton(
+            actions,
+            text="▦ Report",
+            command=self._show_report_tab,
+            width=96,
+            height=36,
+            corner_radius=8,
+            fg_color=MD_TEAL_DARK,
+            hover_color="#004D40",
+            font=_md_font(13, "bold"),
         )
-        style.map(
-            "Material.Treeview",
-            background=[("selected", MD_TEAL)],
-            foreground=[("selected", "white")],
-        )
+        self._report_nav_btn.pack(side="left")
 
     def _build_add_tab(self) -> None:
         f = self._add_tab
@@ -276,7 +314,7 @@ class TaskLoggerApp(ctk.CTk):
         btn_row.pack(fill="x", pady=(4, 12))
         ctk.CTkButton(
             btn_row,
-            text="SAVE TASK",
+            text="+ Save task",
             command=self._save_task,
             fg_color=MD_TEAL,
             hover_color=MD_TEAL_DARK,
@@ -286,11 +324,24 @@ class TaskLoggerApp(ctk.CTk):
         ).pack(side="left")
         ctk.CTkButton(
             btn_row,
-            text="Clear form",
+            text="× Clear",
             command=self._clear_and_status,
             fg_color=MD_OUTLINE,
             text_color=MD_TEXT,
             hover_color="#D0D0D0",
+            height=42,
+            corner_radius=8,
+            font=_md_font(13),
+        ).pack(side="left", padx=(12, 0))
+        ctk.CTkButton(
+            btn_row,
+            text="▦ View report",
+            command=self._show_report_tab,
+            fg_color="transparent",
+            text_color=MD_TEAL_DARK,
+            hover_color=MD_SOFT_TEAL,
+            border_width=1,
+            border_color=MD_OUTLINE_STRONG,
             height=42,
             corner_radius=8,
             font=_md_font(13),
@@ -318,10 +369,16 @@ class TaskLoggerApp(ctk.CTk):
         f = self._report_tab
         ctk.CTkLabel(
             f,
-            text="Grouped by project. Export to Excel or CSV.",
+            text="Grouped by project. Review today's work or export it when you're done.",
             font=_md_font(12),
             text_color=MD_TEXT_SECONDARY,
         ).pack(anchor="w", pady=(4, 8))
+
+        metrics = ctk.CTkFrame(f, fg_color="transparent")
+        metrics.pack(fill="x", pady=(0, 12))
+        self._build_metric_card(metrics, "Tasks", self._task_count_var, "+", 0)
+        self._build_metric_card(metrics, "Projects", self._project_count_var, "#", 1)
+        self._build_metric_card(metrics, "Hours", self._today_hours_var, "h", 2)
 
         top = ctk.CTkFrame(f, fg_color="transparent")
         top.pack(fill="x", pady=(0, 8))
@@ -332,7 +389,7 @@ class TaskLoggerApp(ctk.CTk):
         )
         ctk.CTkButton(
             top,
-            text="Export",
+            text="⇩ Export",
             command=self._export_report,
             width=100,
             height=36,
@@ -342,7 +399,7 @@ class TaskLoggerApp(ctk.CTk):
         ).pack(side="right", padx=(8, 0))
         ctk.CTkButton(
             top,
-            text="Refresh",
+            text="↻ Refresh",
             command=self._refresh_report,
             width=100,
             height=36,
@@ -352,41 +409,24 @@ class TaskLoggerApp(ctk.CTk):
             hover_color="#D0D0D0",
         ).pack(side="right")
 
-        cols = ("seq", "project", "title", "desc", "blockers", "hrs")
-        tree_wrap = ctk.CTkFrame(f, fg_color=MD_CARD, corner_radius=12, border_width=1, border_color=MD_OUTLINE)
-        tree_wrap.pack(fill="both", expand=True)
+        table = ctk.CTkFrame(f, fg_color=MD_CARD, corner_radius=12, border_width=1, border_color=MD_OUTLINE)
+        table.pack(fill="both", expand=True)
 
-        inner = tk.Frame(tree_wrap, bg="#FFFFFF")
-        inner.pack(fill="both", expand=True, padx=8, pady=8)
+        header = ctk.CTkFrame(table, fg_color="#EEEEEE", corner_radius=8)
+        header.pack(fill="x", padx=8, pady=(8, 0))
+        self._configure_report_grid(header)
+        for col, (_key, label, width, _weight) in enumerate(REPORT_COLS):
+            ctk.CTkLabel(
+                header,
+                text=label,
+                width=width,
+                font=_md_font(11, "bold"),
+                text_color=MD_TEXT,
+                anchor="w",
+            ).grid(row=0, column=col, sticky="ew", padx=6, pady=8)
 
-        self._tree = ttk.Treeview(
-            inner,
-            columns=cols,
-            show="headings",
-            height=16,
-            selectmode="browse",
-            style="Material.Treeview",
-        )
-        self._tree.tag_configure("odd", background=ROW_ALT)
-        self._tree.tag_configure("even", background="#FFFFFF")
-        self._tree.heading("seq", text="#")
-        self._tree.heading("project", text="Project")
-        self._tree.heading("title", text="Task Title")
-        self._tree.heading("desc", text="Task Description")
-        self._tree.heading("blockers", text="Challenges / Blockers")
-        self._tree.heading("hrs", text="Efforts hrs")
-
-        self._tree.column("seq", width=44, anchor="center", stretch=False)
-        self._tree.column("project", width=120, stretch=True)
-        self._tree.column("title", width=140, stretch=True)
-        self._tree.column("desc", width=160, stretch=True)
-        self._tree.column("blockers", width=130, stretch=True)
-        self._tree.column("hrs", width=88, anchor="e", stretch=False)
-
-        vsb = ttk.Scrollbar(inner, orient="vertical", command=self._tree.yview)
-        self._tree.configure(yscrollcommand=vsb.set)
-        self._tree.pack(side="left", fill="both", expand=True)
-        vsb.pack(side="right", fill="y")
+        self._report_rows = SmoothScrollableFrame(table, fg_color="transparent", corner_radius=0)
+        self._report_rows.pack(fill="both", expand=True, padx=8, pady=8)
 
         self._total_var = tk.StringVar(value="Total Efforts: —")
         ctk.CTkLabel(f, textvariable=self._total_var, font=_md_font(14, "bold"), text_color=MD_TEAL_DARK).pack(
@@ -395,13 +435,128 @@ class TaskLoggerApp(ctk.CTk):
 
         self._refresh_report()
 
-    def _on_tab_changed(self) -> None:
-        try:
-            name = self._tabview.get()
-        except Exception:
+    def _build_metric_card(
+        self,
+        parent: ctk.CTkFrame,
+        label: str,
+        value_var: tk.StringVar,
+        icon: str,
+        col: int,
+    ) -> None:
+        card = ctk.CTkFrame(parent, fg_color=MD_CARD, corner_radius=12, border_width=1, border_color=MD_OUTLINE)
+        card.grid(row=0, column=col, sticky="ew", padx=(0, 10) if col < 2 else (0, 0))
+        parent.columnconfigure(col, weight=1)
+
+        row = ctk.CTkFrame(card, fg_color="transparent")
+        row.pack(fill="x", padx=14, pady=12)
+        badge = ctk.CTkLabel(
+            row,
+            text=icon,
+            width=32,
+            height=32,
+            corner_radius=16,
+            fg_color=MD_SOFT_TEAL,
+            text_color=MD_TEAL_DARK,
+            font=_md_font(14, "bold"),
+        )
+        badge.pack(side="left", padx=(0, 10))
+        text = ctk.CTkFrame(row, fg_color="transparent")
+        text.pack(side="left", fill="x", expand=True)
+        ctk.CTkLabel(text, text=label, font=_md_font(11), text_color=MD_TEXT_SECONDARY).pack(anchor="w")
+        ctk.CTkLabel(text, textvariable=value_var, font=_md_font(20, "bold"), text_color=MD_TEXT).pack(anchor="w")
+
+    def _configure_report_grid(self, frame: ctk.CTkFrame) -> None:
+        for col, (_key, _label, _width, weight) in enumerate(REPORT_COLS):
+            frame.columnconfigure(col, weight=weight, uniform="report")
+
+    def _report_cell(self, parent: ctk.CTkFrame, value: object, col: int, *, bold: bool = False) -> None:
+        _key, _label, width, _weight = REPORT_COLS[col]
+        ctk.CTkLabel(
+            parent,
+            text="" if value is None else str(value),
+            width=width,
+            wraplength=max(40, width - 12),
+            font=_md_font(11, "bold" if bold else "normal"),
+            text_color=MD_TEXT,
+            anchor="w",
+            justify="left",
+        ).grid(row=0, column=col, sticky="new", padx=6, pady=10)
+
+    def _clear_report_rows(self) -> None:
+        if not hasattr(self, "_report_rows"):
             return
-        if name == "Today's report":
+        for child in self._report_rows.winfo_children():
+            child.destroy()
+
+    def _add_empty_report_row(self) -> None:
+        row = ctk.CTkFrame(self._report_rows, fg_color=MD_CARD, corner_radius=8)
+        row.pack(fill="x", pady=(0, 6))
+        ctk.CTkLabel(
+            row,
+            text="No tasks for today.",
+            font=_md_font(12),
+            text_color=MD_TEXT_SECONDARY,
+            anchor="w",
+        ).pack(fill="x", padx=14, pady=14)
+
+    def _add_report_row(self, seq: int, task: dict[str, object], hrs: float, is_odd: bool) -> None:
+        row = ctk.CTkFrame(
+            self._report_rows,
+            fg_color=ROW_ALT if is_odd else MD_CARD,
+            corner_radius=8,
+            border_width=1,
+            border_color="#EEEEEE",
+        )
+        row.pack(fill="x", pady=(0, 6))
+        self._configure_report_grid(row)
+        self._report_cell(row, seq, 0)
+        self._report_cell(row, task.get("project", "-"), 1)
+        self._report_cell(row, task.get("task_title", ""), 2, bold=True)
+        self._report_cell(row, task.get("task_description", ""), 3)
+        self._report_cell(row, task.get("blockers", ""), 4)
+        self._report_cell(row, format_hours(hrs), 5)
+
+    def _show_add_tab(self) -> None:
+        self._show_page("log")
+        if hasattr(self, "_title_entry"):
+            try:
+                self._title_entry.focus_set()
+            except Exception:
+                pass
+
+    def _show_report_tab(self) -> None:
+        self._show_page("report")
+        if hasattr(self, "_report_rows"):
             self._refresh_report()
+
+    def _show_page(self, page: str) -> None:
+        if not hasattr(self, "_add_tab") or not hasattr(self, "_report_tab"):
+            return
+        self._add_tab.pack_forget()
+        self._report_tab.pack_forget()
+        if page == "report":
+            self._report_tab.pack(fill="both", expand=True, padx=16, pady=16)
+        else:
+            self._add_tab.pack(fill="both", expand=True, padx=16, pady=16)
+            page = "log"
+        self._active_page = page
+        self._update_nav_buttons()
+
+    def _update_nav_buttons(self) -> None:
+        if not hasattr(self, "_log_nav_btn") or not hasattr(self, "_report_nav_btn"):
+            return
+        active = {
+            "fg_color": "white",
+            "text_color": MD_TEAL_DARK,
+            "hover_color": MD_SOFT_TEAL,
+        }
+        inactive = {
+            "fg_color": MD_TEAL_DARK,
+            "text_color": "white",
+            "hover_color": "#004D40",
+        }
+        self._log_nav_btn.configure(**(active if self._active_page == "log" else inactive))
+        self._report_nav_btn.configure(**(active if self._active_page == "report" else inactive))
 
     def _clear_form(self) -> None:
         self._project_var.set("")
@@ -628,18 +783,22 @@ class TaskLoggerApp(ctk.CTk):
     def _refresh_report(self) -> None:
         data = load_tasks()
         got = sorted_today_tasks(data, group_by_project=True)
-        for item in self._tree.get_children():
-            self._tree.delete(item)
+        self._clear_report_rows()
 
         if got is None:
             self._date_var.set(f"Date: {get_today_date()}")
             self._total_var.set("No tasks for today.")
+            self._task_count_var.set("0")
+            self._project_count_var.set("0")
+            self._today_hours_var.set("0")
+            self._add_empty_report_row()
             return
 
         date_str, tasks = got
         self._date_var.set(f"Date: {date_str}")
         total = 0.0
         seq = 0
+        projects: set[str] = set()
         for t in tasks:
             e = t.get("efforts_hrs")
             try:
@@ -647,22 +806,15 @@ class TaskLoggerApp(ctk.CTk):
             except (TypeError, ValueError):
                 hrs = 0.0
             total += hrs
+            project = str(t.get("project", "-") or "-").strip()
+            if project and project != "-":
+                projects.add(project.lower())
             seq += 1
-            tag = "odd" if seq % 2 else "even"
-            self._tree.insert(
-                "",
-                tk.END,
-                values=(
-                    seq,
-                    t.get("project", "-"),
-                    t.get("task_title", ""),
-                    t.get("task_description", ""),
-                    t.get("blockers", ""),
-                    format_hours(hrs),
-                ),
-                tags=(tag,),
-            )
+            self._add_report_row(seq, t, hrs, is_odd=bool(seq % 2))
         self._total_var.set(f"Total Efforts: {format_hours(total)} hrs")
+        self._task_count_var.set(str(seq))
+        self._project_count_var.set(str(len(projects)))
+        self._today_hours_var.set(format_hours(total))
 
     def _export_report(self) -> None:
         data = load_tasks()
