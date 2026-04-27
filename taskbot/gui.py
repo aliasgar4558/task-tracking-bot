@@ -50,6 +50,8 @@ MD_OUTLINE_STRONG = "#BDBDBD"
 MD_TEXT = "#212121"
 MD_TEXT_SECONDARY = "#757575"
 MD_SOFT_TEAL = "#E0F2F1"
+IOS_GROUP_BG = "#F2F2F7"
+IOS_FIELD_BG = "#FFFFFF"
 ROW_ALT = "#F5F5F5"
 REPORT_COLS = (
     ("seq", "#", 44, 0),
@@ -135,18 +137,18 @@ class TaskLoggerApp(ctk.CTk):
         self._project_count_var = tk.StringVar(value="0")
         self._today_hours_var = tk.StringVar(value="0")
         self._active_page = "log"
+        self._report_dirty = True
 
         self._build_header()
-        self._content = ctk.CTkFrame(self, corner_radius=12, fg_color=MD_CARD)
-        self._content.pack(fill="both", expand=True, padx=16, pady=(16, 16))
-        self._add_tab = ctk.CTkFrame(self._content, fg_color="transparent")
-        self._report_tab = ctk.CTkFrame(self._content, fg_color="transparent")
+        self._content = ctk.CTkFrame(self, corner_radius=0, fg_color=MD_SURFACE)
+        self._content.pack(fill="both", expand=True)
+        self._add_tab = ctk.CTkFrame(self._content, fg_color=IOS_GROUP_BG)
+        self._report_tab = ctk.CTkFrame(self._content, fg_color=MD_CARD)
 
         self._build_add_tab()
         self._build_report_tab()
         self._show_add_tab()
-
-        self._refresh_project_values()
+        self.after(120, self._refresh_project_values)
 
     def _setup_macos_menu_bar(self) -> None:
         """Replace the default 'Python' application menu with APP_NAME (Tk + macOS)."""
@@ -223,105 +225,146 @@ class TaskLoggerApp(ctk.CTk):
         )
         self._report_nav_btn.pack(side="left")
 
+    @staticmethod
+    def _set_scroll_canvas_bg(scroll: ctk.CTkScrollableFrame, color: str) -> None:
+        canvas = getattr(scroll, "_parent_canvas", None)
+        if canvas is not None:
+            try:
+                canvas.configure(bg=color, highlightthickness=0)
+            except tk.TclError:
+                pass
+
     def _build_add_tab(self) -> None:
         f = self._add_tab
-        scroll = ctk.CTkScrollableFrame(f, fg_color="transparent")
+        scroll = ctk.CTkScrollableFrame(f, fg_color=IOS_GROUP_BG, corner_radius=0)
+        self._set_scroll_canvas_bg(scroll, IOS_GROUP_BG)
         scroll.pack(fill="both", expand=True)
 
+        hero = ctk.CTkFrame(scroll, fg_color="transparent")
+        hero.pack(fill="x", padx=4, pady=(0, 10))
+        ctk.CTkLabel(hero, text="New task", font=_md_font(22, "bold"), text_color=MD_TEXT).pack(anchor="w")
         ctk.CTkLabel(
-            scroll,
-            text="Fill in a task and save. Switch to Today's report to review or export.",
+            hero,
+            text="Capture the important bits, then save it to today's local report.",
             font=_md_font(12),
             text_color=MD_TEXT_SECONDARY,
-        ).pack(anchor="w", pady=(4, 12))
+        ).pack(anchor="w", pady=(4, 0))
 
         self._project_var = tk.StringVar()
-        basics_outer = ctk.CTkFrame(scroll, fg_color=MD_CARD, corner_radius=12, border_width=1, border_color=MD_OUTLINE)
-        basics_outer.pack(fill="x", pady=(0, 12))
+        basics_outer = ctk.CTkFrame(scroll, fg_color=IOS_FIELD_BG, corner_radius=14, border_width=1, border_color=MD_OUTLINE)
+        basics_outer.pack(fill="x", pady=(0, 8))
         ctk.CTkLabel(
             basics_outer,
-            text="What you're working on",
-            font=_md_font(13, "bold"),
+            text="TASK",
+            font=_md_font(11, "bold"),
             text_color=MD_TEXT_SECONDARY,
-        ).pack(anchor="w", padx=16, pady=(14, 8))
+        ).pack(anchor="w", padx=14, pady=(10, 6))
         basics = ctk.CTkFrame(basics_outer, fg_color="transparent")
-        basics.pack(fill="x", padx=16, pady=(0, 14))
+        basics.pack(fill="x", padx=14, pady=(0, 12))
+        basics.columnconfigure(0, weight=3)
+        basics.columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(basics, text="Project", font=_md_font(12, "bold")).grid(row=0, column=0, sticky="nw")
+        ctk.CTkLabel(basics, text="Project", font=_md_font(12, "bold"), text_color=MD_TEXT).grid(
+            row=0, column=0, sticky="w", pady=(0, 6)
+        )
+        ctk.CTkLabel(basics, text="Efforts", font=_md_font(12, "bold"), text_color=MD_TEXT).grid(
+            row=0, column=1, sticky="w", padx=(14, 0), pady=(0, 6)
+        )
         self._project_box = ctk.CTkComboBox(
             basics,
             values=[],
             variable=self._project_var,
-            width=560,
-            height=36,
-            corner_radius=8,
+            height=40,
+            corner_radius=10,
             border_width=1,
+            fg_color=IOS_FIELD_BG,
         )
-        self._project_box.grid(row=0, column=1, sticky="ew", pady=(0, 4))
-        self._refresh_project_values()
+        self._project_box.grid(row=1, column=0, sticky="ew")
         self._project_var.trace_add("write", self._on_project_change)
         self._project_box.bind("<Alt-Down>", self._open_project_dropdown)
         self._project_box.bind("<Control-space>", self._open_project_dropdown)
         self._bind_editing_shortcuts(self._project_box)
-        ctk.CTkLabel(basics, text="Optional — type a new name or pick from the list", font=_md_font(11), text_color=MD_TEXT_SECONDARY).grid(
-            row=1, column=1, sticky="w"
+
+        self._eff_var = tk.StringVar()
+        self._eff_entry = ctk.CTkEntry(
+            basics,
+            textvariable=self._eff_var,
+            height=40,
+            corner_radius=10,
+            border_width=1,
+            fg_color=IOS_FIELD_BG,
+            placeholder_text="2.5",
+        )
+        self._eff_entry.grid(row=1, column=1, sticky="ew", padx=(14, 0))
+        self._bind_editing_shortcuts(self._eff_entry)
+
+        ctk.CTkLabel(
+            basics,
+            text="Type a new project or pick from your history",
+            font=_md_font(11),
+            text_color=MD_TEXT_SECONDARY,
+        ).grid(row=2, column=0, sticky="w", pady=(4, 0))
+        ctk.CTkLabel(basics, text="Hours", font=_md_font(11), text_color=MD_TEXT_SECONDARY).grid(
+            row=2, column=1, sticky="w", padx=(14, 0), pady=(4, 0)
         )
 
-        ctk.CTkLabel(basics, text="Task title", font=_md_font(12, "bold")).grid(row=2, column=0, sticky="nw", pady=(12, 0))
+        ctk.CTkLabel(basics, text="Task title", font=_md_font(12, "bold"), text_color=MD_TEXT).grid(
+            row=3, column=0, columnspan=2, sticky="w", pady=(10, 5)
+        )
         self._title_var = tk.StringVar()
-        self._title_entry = ctk.CTkEntry(basics, textvariable=self._title_var, width=560, height=36, corner_radius=8)
-        self._title_entry.grid(row=2, column=1, sticky="ew", pady=(12, 0))
+        self._title_entry = ctk.CTkEntry(
+            basics,
+            textvariable=self._title_var,
+            height=42,
+            corner_radius=10,
+            border_width=1,
+            fg_color=IOS_FIELD_BG,
+            placeholder_text="What did you work on?",
+        )
+        self._title_entry.grid(row=4, column=0, columnspan=2, sticky="ew")
         self._bind_editing_shortcuts(self._title_entry)
-        basics.columnconfigure(1, weight=1)
 
-        details_outer = ctk.CTkFrame(scroll, fg_color=MD_CARD, corner_radius=12, border_width=1, border_color=MD_OUTLINE)
-        details_outer.pack(fill="x", pady=(0, 12))
+        details_outer = ctk.CTkFrame(scroll, fg_color=IOS_FIELD_BG, corner_radius=14, border_width=1, border_color=MD_OUTLINE)
+        details_outer.pack(fill="x", pady=(0, 8))
         ctk.CTkLabel(
             details_outer,
-            text="Details (optional)",
-            font=_md_font(13, "bold"),
+            text="DETAILS",
+            font=_md_font(11, "bold"),
             text_color=MD_TEXT_SECONDARY,
-        ).pack(anchor="w", padx=16, pady=(14, 8))
+        ).pack(anchor="w", padx=14, pady=(10, 6))
         details = ctk.CTkFrame(details_outer, fg_color="transparent")
-        details.pack(fill="x", padx=16, pady=(0, 14))
+        details.pack(fill="x", padx=14, pady=(0, 12))
+        details.columnconfigure(0, weight=1)
 
-        ctk.CTkLabel(details, text="Description", font=_md_font(12, "bold")).grid(row=0, column=0, sticky="nw")
-        self._desc_text = ctk.CTkTextbox(details, width=560, height=110, corner_radius=8, border_width=1)
-        self._desc_text.grid(row=0, column=1, sticky="ew", pady=(0, 10))
+        ctk.CTkLabel(details, text="Description", font=_md_font(12, "bold"), text_color=MD_TEXT).grid(
+            row=0, column=0, sticky="w", pady=(0, 5)
+        )
+        self._desc_text = ctk.CTkTextbox(details, height=78, corner_radius=10, border_width=1, fg_color=IOS_FIELD_BG)
+        self._desc_text.grid(row=1, column=0, sticky="ew")
         self._bind_editing_shortcuts(self._desc_text)
 
-        ctk.CTkLabel(details, text="Blockers", font=_md_font(12, "bold")).grid(row=1, column=0, sticky="nw")
-        self._block_text = ctk.CTkTextbox(details, width=560, height=88, corner_radius=8, border_width=1)
-        self._block_text.grid(row=1, column=1, sticky="ew")
-        self._bind_editing_shortcuts(self._block_text)
-        details.columnconfigure(1, weight=1)
-
-        time_outer = ctk.CTkFrame(scroll, fg_color=MD_CARD, corner_radius=12, border_width=1, border_color=MD_OUTLINE)
-        time_outer.pack(fill="x", pady=(0, 12))
-        ctk.CTkLabel(time_outer, text="Time", font=_md_font(13, "bold"), text_color=MD_TEXT_SECONDARY).pack(
-            anchor="w", padx=16, pady=(14, 8)
+        ctk.CTkLabel(details, text="Blockers", font=_md_font(12, "bold"), text_color=MD_TEXT).grid(
+            row=2, column=0, sticky="w", pady=(10, 5)
         )
-        time_row = ctk.CTkFrame(time_outer, fg_color="transparent")
-        time_row.pack(fill="x", padx=16, pady=(0, 14))
-        ctk.CTkLabel(time_row, text="Efforts (hours)", font=_md_font(12, "bold")).pack(side="left", padx=(0, 12))
-        self._eff_var = tk.StringVar()
-        self._eff_entry = ctk.CTkEntry(time_row, textvariable=self._eff_var, width=120, height=36, corner_radius=8)
-        self._eff_entry.pack(side="left")
-        self._bind_editing_shortcuts(self._eff_entry)
-        ctk.CTkLabel(time_row, text="  e.g. 2 or 2.5", font=_md_font(11), text_color=MD_TEXT_SECONDARY).pack(side="left", padx=(12, 0))
+        self._block_text = ctk.CTkTextbox(details, height=66, corner_radius=10, border_width=1, fg_color=IOS_FIELD_BG)
+        self._block_text.grid(row=3, column=0, sticky="ew")
+        self._bind_editing_shortcuts(self._block_text)
 
         btn_row = ctk.CTkFrame(scroll, fg_color="transparent")
-        btn_row.pack(fill="x", pady=(4, 12))
+        btn_row.pack(fill="x", pady=(2, 8))
+        btn_row.columnconfigure(0, weight=1)
+        btn_row.columnconfigure(1, weight=1)
+        btn_row.columnconfigure(2, weight=1)
         ctk.CTkButton(
             btn_row,
             text="+ Save task",
             command=self._save_task,
             fg_color=MD_TEAL,
             hover_color=MD_TEAL_DARK,
-            height=42,
-            corner_radius=8,
+            height=40,
+            corner_radius=12,
             font=_md_font(13, "bold"),
-        ).pack(side="left")
+        ).grid(row=0, column=0, sticky="ew")
         ctk.CTkButton(
             btn_row,
             text="× Clear",
@@ -329,10 +372,10 @@ class TaskLoggerApp(ctk.CTk):
             fg_color=MD_OUTLINE,
             text_color=MD_TEXT,
             hover_color="#D0D0D0",
-            height=42,
-            corner_radius=8,
+            height=40,
+            corner_radius=12,
             font=_md_font(13),
-        ).pack(side="left", padx=(12, 0))
+        ).grid(row=0, column=1, sticky="ew", padx=(10, 0))
         ctk.CTkButton(
             btn_row,
             text="▦ View report",
@@ -342,13 +385,13 @@ class TaskLoggerApp(ctk.CTk):
             hover_color=MD_SOFT_TEAL,
             border_width=1,
             border_color=MD_OUTLINE_STRONG,
-            height=42,
-            corner_radius=8,
+            height=40,
+            corner_radius=12,
             font=_md_font(13),
-        ).pack(side="left", padx=(12, 0))
+        ).grid(row=0, column=2, sticky="ew", padx=(10, 0))
 
-        status_card = ctk.CTkFrame(scroll, fg_color="#E8F5E9", corner_radius=10, border_width=1, border_color="#C8E6C9")
-        status_card.pack(fill="x", pady=(8, 8))
+        status_card = ctk.CTkFrame(scroll, fg_color="#E8F5E9", corner_radius=14, border_width=1, border_color="#C8E6C9")
+        self._status_card = status_card
         ctk.CTkLabel(
             status_card,
             textvariable=self._status_var,
@@ -356,14 +399,14 @@ class TaskLoggerApp(ctk.CTk):
             text_color="#2E7D32",
             anchor="w",
             justify="left",
-        ).pack(anchor="w", padx=14, pady=12)
+        ).pack(anchor="w", padx=12, pady=8)
 
         ctk.CTkLabel(
             scroll,
             text="Data file (installed): ~/.taskbot/task_logs.json",
             font=_md_font(11),
             text_color=MD_TEXT_SECONDARY,
-        ).pack(anchor="w", pady=(0, 8))
+        ).pack(anchor="w", pady=(2, 4))
 
     def _build_report_tab(self) -> None:
         f = self._report_tab
@@ -425,15 +468,14 @@ class TaskLoggerApp(ctk.CTk):
                 anchor="w",
             ).grid(row=0, column=col, sticky="ew", padx=6, pady=8)
 
-        self._report_rows = SmoothScrollableFrame(table, fg_color="transparent", corner_radius=0)
+        self._report_rows = SmoothScrollableFrame(table, fg_color=MD_CARD, corner_radius=0)
+        self._set_scroll_canvas_bg(self._report_rows, MD_CARD)
         self._report_rows.pack(fill="both", expand=True, padx=8, pady=8)
 
         self._total_var = tk.StringVar(value="Total Efforts: —")
         ctk.CTkLabel(f, textvariable=self._total_var, font=_md_font(14, "bold"), text_color=MD_TEAL_DARK).pack(
             anchor="w", pady=(12, 8)
         )
-
-        self._refresh_report()
 
     def _build_metric_card(
         self,
@@ -527,7 +569,8 @@ class TaskLoggerApp(ctk.CTk):
     def _show_report_tab(self) -> None:
         self._show_page("report")
         if hasattr(self, "_report_rows"):
-            self._refresh_report()
+            if self._report_dirty:
+                self._refresh_report()
 
     def _show_page(self, page: str) -> None:
         if not hasattr(self, "_add_tab") or not hasattr(self, "_report_tab"):
@@ -537,7 +580,7 @@ class TaskLoggerApp(ctk.CTk):
         if page == "report":
             self._report_tab.pack(fill="both", expand=True, padx=16, pady=16)
         else:
-            self._add_tab.pack(fill="both", expand=True, padx=16, pady=16)
+            self._add_tab.pack(fill="both", expand=True)
             page = "log"
         self._active_page = page
         self._update_nav_buttons()
@@ -571,7 +614,17 @@ class TaskLoggerApp(ctk.CTk):
 
     def _clear_and_status(self) -> None:
         self._status_var.set("")
+        self._hide_status()
         self._clear_form()
+
+    def _show_status(self, message: str) -> None:
+        self._status_var.set(message)
+        if hasattr(self, "_status_card") and not self._status_card.winfo_ismapped():
+            self._status_card.pack(fill="x", pady=(6, 6))
+
+    def _hide_status(self) -> None:
+        if hasattr(self, "_status_card"):
+            self._status_card.pack_forget()
 
     def _refresh_project_values(self) -> None:
         current = ""
@@ -768,8 +821,10 @@ class TaskLoggerApp(ctk.CTk):
             messagebox.showerror("Cannot save", msg, parent=self)
             return
 
-        self._refresh_report()
-        self._status_var.set(msg)
+        self._report_dirty = True
+        if self._active_page == "report":
+            self._refresh_report()
+        self._show_status(msg)
         self._refresh_project_values()
         self._title_var.set("")
         self._desc_text.delete("1.0", "end")
@@ -792,6 +847,7 @@ class TaskLoggerApp(ctk.CTk):
             self._project_count_var.set("0")
             self._today_hours_var.set("0")
             self._add_empty_report_row()
+            self._report_dirty = False
             return
 
         date_str, tasks = got
@@ -815,6 +871,7 @@ class TaskLoggerApp(ctk.CTk):
         self._task_count_var.set(str(seq))
         self._project_count_var.set(str(len(projects)))
         self._today_hours_var.set(format_hours(total))
+        self._report_dirty = False
 
     def _export_report(self) -> None:
         data = load_tasks()
@@ -843,7 +900,7 @@ class TaskLoggerApp(ctk.CTk):
                 ok, msg = export_report_csv(csv_path, date_str, tasks)
 
         if ok:
-            self._status_var.set(msg)
+            self._show_status(msg)
         else:
             messagebox.showerror("Export failed", msg, parent=self)
 
