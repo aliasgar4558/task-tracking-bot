@@ -1,47 +1,41 @@
 # Local Daily Task Logger Bot (V1)
 
-Offline task logger with a **CLI** and **desktop GUI**. The GUI uses [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter). No cloud or AI.
+Offline task logger: **CLI** + **desktop GUI** ([CustomTkinter](https://github.com/TomSchimansky/CustomTkinter)). No cloud or AI.
 
 **Repo:** [aliasgar4558/task-tracking-bot](https://github.com/aliasgar4558/task-tracking-bot) (flat layout: `pyproject.toml` and `taskbot/` at the root).
 
 ## Install
 
-Two options. Data file: `~/.taskbot/task_logs.json`.
-
-**1. Script** (venv + symlinks into `~/.local/bin`; add that folder to `PATH` if the script prints the export line):
+**One step** (needs **Python 3.10+** and **git**; uses a private venv, no global `pip`, no pipx):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aliasgar4558/task-tracking-bot/master/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/aliasgar4558/task-tracking-bot/master/install.py | python3
 ```
 
-Already cloned: `./install.sh`, or `./install.sh --local` for editable install. Needs Python **3.10+** and **git** for the remote install. The GUI dependency, `customtkinter`, is installed with TaskBot.
+Replace `master` with your default branch if different.
 
-**2. pipx**
+Afterward run **`taskbot`** and **`taskbot-gui`**. If the installer prints an `export PATH=...` line, add it to your shell config.
+
+Task log file: **`~/.taskbot/task_logs.json`**. The installer puts the venv under `~/.local/share/taskbot` when possible; otherwise **`~/.taskbot`**. If your home folder is locked down, set **`TASKBOT_HOME`** (and optionally **`TASKBOT_BIN`**) to writable paths before running the command above.
+
+**Already cloned the repo?** From the repo root:
 
 ```bash
-pipx install "git+https://github.com/aliasgar4558/task-tracking-bot.git"
+python3 install.py --local
 ```
 
-On macOS, once: `brew install pipx && pipx ensurepath`.
+(or `./install.sh --local`, same thing.)
 
-Then: `taskbot`, `taskbot-gui`.
-
-Optional extras (same env as TaskBot): `tabulate` (nicer CLI tables), `openpyxl` (Excel export in the GUI).
+Optional extras (install into that same venv later): **`tabulate`**, **`openpyxl`**.
 
 ## CLI
 
-Use `taskbot` plus a command:
-
-
-| Command          | What it does                                                                                                          |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `taskbot add`    | Prompts for tasks for today (project optional, title, description, blockers, hours). Can add multiple in one session. |
-| `taskbot report` | Prints today's report as a table (grouped by project).                                                                |
-| `taskbot list`   | Same table as `report`.                                                                                               |
-| `taskbot help`   | Prints usage for all commands.                                                                                        |
-
-
-Examples:
+| Command | What it does |
+|--------|----------------|
+| `taskbot add` | Prompts for tasks for today (project optional, title, description, blockers, hours). |
+| `taskbot report` | Today's report table (grouped by project). |
+| `taskbot list` | Same table as `report`. |
+| `taskbot help` | Prints usage. |
 
 ```bash
 taskbot add
@@ -50,18 +44,14 @@ taskbot list
 taskbot help
 ```
 
-Without installing from PyPI/git, from the repo root use `python3 bot.py` instead of `taskbot` (same subcommands). Desktop GUI: `python3 gui.py` or `taskbot-gui` after install.
+Without installing: from repo root **`python3 bot.py`** with the same subcommands; GUI **`python3 gui.py`** or **`taskbot-gui`** after install.
 
-macOS: CustomTkinter runs on top of Tk. If the GUI fails with `_tkinter` missing, install Tk for your Python (e.g. `brew install python-tk@X.Y` matching `python3 --version`) or use [python.org](https://www.python.org/downloads/) Python.
+macOS: if the GUI reports missing `_tkinter`, install Tk for your Python (e.g. `brew install python-tk@X.Y` matching `python3 --version`) or use [python.org](https://www.python.org/downloads/) Python.
 
 ## JSON shape
 
 Dates are `YYYY-MM-DD` keys; each day is a list of tasks (`id`, `project`, `task_title`, `task_description`, `blockers`, `efforts_hrs`). Empty optionals stored as `"-"`.
 
-## Future Enhancements (V2 - Do Not Implement Now)
+## V2 ideas (not built)
 
-- AI-based rephrasing
-- Task editing and deletion
-- Weekly/monthly reports
-- Web interface
-- Local AI integration (Ollama)
+Edits/deletes, weekly reports, AI.
